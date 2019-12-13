@@ -41,3 +41,23 @@ class Encoder(object):
         self.beta1 = beta1
         self.beta2 = beta2
         self.t = 0
+
+    def forward(self, x):
+        """
+        """
+        self.e_input = x.reshape((self.batch_size, -1))
+        
+        # Dimension check on input
+        assert self.e_input.shape == (self.batch_size, self.input_channels)
+
+        self.h0_l = self.e_input.dot(self.W0) + self.b0
+        self.h0_a = relu(self.h0_l)
+
+        self.logvar = self.h0_a.dot(self.W_logvar) + self.b_logvar
+        self.mu = self.h0_a.dot(self.W_mu) + self.b_mu
+
+        self.rand_sample = np.random.standard_normal(size=(self.batch_size, self.nz))
+        self.sample_z = self.mu + np.exp(self.logvar * .5) * self.rand_sample
+
+        return self.sample_z, self.mu, self.logvar
+
