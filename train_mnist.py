@@ -16,11 +16,15 @@ from vae.utils.functionals import MSELoss
 
 eps = 10e-8
 np.random.seed(42)
+np.seterr(all='raise')
 
 
 def train_mnist(vae_model, data_path, label_path,
-        epochs=20, batch_size=64, save_path='./artifacts', save_freq=4):
-    
+                epochs=20, batch_size=64, print_freq=100,
+                save_path='./artifacts', save_freq=2):
+    """
+    """
+
     # reading training data
     trainX, _ = mnist_reader(data_path, label_path)
 
@@ -35,7 +39,7 @@ def train_mnist(vae_model, data_path, label_path,
     total_iter = 0
 
     for epoch in range(epochs):
-        for b_idx in range(batch_length):
+        for b_idx in range(batch_length//2):
             # prepare batch data
             b_start = b_idx * batch_size
             b_end = b_start + batch_size
@@ -61,7 +65,7 @@ def train_mnist(vae_model, data_path, label_path,
             loss = loss / batch_size
 
             # Loss record tracking
-            total_rec_loss += rec_loss / batch_size
+            total_rec_loss += rec_loss
             total_kl_loss += kl / batch_size
             total_iter += 1
 
@@ -70,19 +74,21 @@ def train_mnist(vae_model, data_path, label_path,
             # ---------------------------
             # calculate gradient and upate the weights using adam
             vae_model.backward(train_batch, out)
-            
-        print("Epochs [{:03d}/{:03d}] | RC Loss: {:.4f} | KL Loss: {:.4f}".format(
-            epoch, epochs, rec_loss / batch_size, kl / batch_size 
-        ))
 
-        if epoch % save_freq == 0:
+            # Logging
+            if (b_idx+1) % print_freq == 0:
+                print("Epochs [{:03d}/{:03d}] Iter[{:03d}/{:03d}] | RC Loss: {:.4f} | KL Loss: {:.4f}".format(
+                    epoch, epochs, (b_idx+1) * batch_size, batch_length * batch_size, 
+                    rec_loss, kl / batch_size
+                ))
+
+        if (b_idx+1) % save_freq == 0:
             print("Saving image ... ")
-            # save reconstructed image every save freq
-            img_ = np.reshape(out, newshape=train_batch.shape)
+            # save 16 reconstructed images every save_freq
+            imgs_ = np.reshape(out, newshape=train_batch.shape)
             if cpu_enabled == 1:
-                img = np.array(img_)
-            img_tile(img_, save_path, epoch)
-
+                imgs = np.array(imgs_)
+            img_tile(imgs_, save_path, epoch)
 
 
 if __name__ == '__main__':
@@ -93,9 +99,17 @@ if __name__ == '__main__':
 
     batch_size = 64
     lr = 1e-4
+    beta1 = 0.9 
+    beta2 = 0.999
+    weight_decay = 0.1
 
+    optimiser_kwargs = dict(lr=lr, betas=(beta1, beta2), weight_decay=weight_decay)
+
+    # create model
     vae_model = VariationalAutoEncoder(in_channel, layer_size, nz, 
-                                        batch_size=batch_size, lr=lr,
-                                        beta1=0.5, beta2=0.999)
-    train_mnist(vae_model, data_path='gaussian_vae/data/train-images-idx3-ubyte',
-                label_path='gaussian_vae/data/train-labels-idx1-ubyte')
+                                        batch_size=batch_size, **optimiser_kwargs)
+    # run training session
+    train_mnist(vae_model, 
+                data_path='./data/train-images-idx3-ubyte',
+                label_path='./data/train-labels-idx1-ubyte',
+                batch_size=batch_size, print_freq=100, save_freq=1)
