@@ -8,14 +8,14 @@ except ImportError:
 
 from vae.utils.functionals import initialise_weight, initialise_bias
 from vae.utils.functionals import relu, sigmoid
-
+from vae.utils.optimiser import AdamOptim
 
 eps = 10e-8
 
 
 class Encoder(object):
     def __init__(self, input_channels, layer_size, nz, 
-                batch_size=64, lr=1e-3, beta1=0.9, beta2=0.999):
+                batch_size=64, **optimiser_kwargs):
         """
         """
         self.input_channels = input_channels
@@ -34,13 +34,10 @@ class Encoder(object):
         self.W_logvar = initialise_weight(self.layer_size, self.nz)
         self.b_logvar = initialise_bias(self.nz)
 
+        params = [self.W0, self.b0, self.W_mu, self.b_mu, self.W_logvar, self.b_logvar]
+
         # Adam optimiser momentum and velocity
-        self.lr = lr
-        self.momentum = [0.0] * 6
-        self.velocity = [0.0] * 6
-        self.beta1 = beta1
-        self.beta2 = beta2
-        self.t = 0
+        self.optimiser = AdamOptim(params, **optimiser_kwargs)
 
     def forward(self, x):
         """
@@ -60,33 +57,6 @@ class Encoder(object):
         self.sample_z = self.mu + np.exp(self.logvar * .5) * self.rand_sample
 
         return self.sample_z, self.mu, self.logvar
-
-    def optimise(self, grads):
-        """
-        """
-        # ---------------------------
-        # Optimise using Adam
-        # ---------------------------
-        self.t += 1
-        # Calculate gradient with momentum and velocity
-        for i, grad in enumerate(grads):
-            self.momentum[i] = self.beta1 * self.momentum[i] + (1 - self.beta1) * grad
-            self.velocity[i] = self.beta2 * self.velocity[i] + (1 - self.beta2) * np.power(grad, 2)
-            m_h = self.momentum[i] / (1 - (self.beta1 ** self.t))
-            v_h = self.velocity[i] /  (1 - (self.beta2 ** self.t))
-            grads[i] = m_h / np.sqrt(v_h + eps)
-
-        grad_W0, grad_b0, grad_W_mu, grad_b_mu, grad_W_logvar, grad_b_logvar = grads
-
-        # Update weights
-        self.W0 = self.W0 - self.lr * np.sum(grad_W0, axis=0)
-        self.b0 = self.b0 - self.lr * np.sum(grad_b0, axis=0)
-        self.W_mu = self.W_mu - self.lr * np.sum(grad_W_mu, axis=0)
-        self.b_mu = self.b_mu - self.lr * np.sum(grad_b_mu, axis=0)
-        self.W_logvar = self.W_logvar - self.lr * np.sum(grad_W_logvar, axis=0)
-        self.b_logvar = self.b_logvar - self.lr * np.sum(grad_b_logvar, axis=0)
-
-        return
 
     def backward(self, x, grad_dec):
         """
@@ -132,6 +102,6 @@ class Encoder(object):
         grads = [grad_W0, grad_b0, grad_W_mu, grad_b_mu, grad_W_logvar, grad_b_logvar]
 
         # Optimise step
-        self.optimise(grads)
+        self.optimiser.step(grads)
 
         return
