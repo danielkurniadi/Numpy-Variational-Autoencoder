@@ -15,7 +15,7 @@ eps = 10e-8
 class VariationalAutoEncoder(object):
 
     def __init__(self, input_channels, layer_size, nz, 
-                batch_size=64, lr=1e-3, beta1=0.9, beta2=0.999):
+                batch_size=64, **optimiser_kwargs):
         
         self.input_channels = input_channels
         self.nz = nz
@@ -25,11 +25,11 @@ class VariationalAutoEncoder(object):
 
         # Construct encoder module
         self.encoder = Encoder(input_channels, layer_size, nz, 
-            batch_size=batch_size, lr=lr, beta1=beta1, beta2=beta2)
-        
+            batch_size=batch_size, **optimiser_kwargs)
+
         # Construct decoder module
         self.decoder = Decoder(input_channels, layer_size, nz,
-            batch_size=batch_size, lr=lr, beta1=beta1, beta2=beta2)
+            batch_size=batch_size, **optimiser_kwargs)
         
     def forward(self, x):
         """
