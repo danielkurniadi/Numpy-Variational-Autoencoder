@@ -7,8 +7,9 @@ except ImportError:
     import numpy as np
 
 from vae.utils.functionals import initialise_weight, initialise_bias
-from vae.utils.functionals import MSELoss
 from vae.utils.functionals import relu, sigmoid
+from vae.utils.functionals import MSELoss
+from vae.utils.optimiser import AdamOptim
 
 
 eps = 10e-8
@@ -16,7 +17,7 @@ eps = 10e-8
 
 class Decoder(object):
     def __init__(self, input_channels, layer_size, nz, 
-                batch_size=64, lr=1e-3, beta1=0.9, beta2=0.999):
+                batch_size=64, **optimiser_kwargs):
         
         self.input_channels = input_channels
         self.nz = nz
@@ -31,13 +32,9 @@ class Decoder(object):
         self.W1 = initialise_weight(self.layer_size, self.input_channels)
         self.b1 = initialise_bias(self.input_channels)
 
-        # Adam optimiser momentum and velocity
-        self.lr = lr
-        self.momentum = [0.0] * 4
-        self.velocity = [0.0] * 4
-        self.beta1 = beta1
-        self.beta2 = beta2
-        self.t = 0
+        params = [self.W0, self.b0, self.W1, self.b1]
+
+        self.optimiser = AdamOptim(params, **optimiser_kwargs)
 
     def forward(self, z):
         self.z = np.reshape(z, (self.batch_size, self.nz))
@@ -46,36 +43,16 @@ class Decoder(object):
         self.h0_a = relu(self.h0_l)
 
         self.h1_l = self.h0_l.dot(self.W1) + self.b1
-        self.h1_a = sigmoid(self.h1_l)
+
+        try:
+            self.h1_a = sigmoid(self.h1_l)
+        except FloatingPointError:
+            print(self.h1_l)
+            raise FloatingPointError
 
         self.d_out = np.reshape(self.h1_a, (self.batch_size, self.input_channels))
 
         return self.d_out
-
-    def optimise(self, grads):
-        """
-        """
-        # ---------------------------
-        # Optimise using Adam
-        # ---------------------------
-        self.t += 1
-        # Calculate gradient with momentum and velocity
-        for i, grad in enumerate(grads):
-            self.momentum[i] = (1 - self.beta1) * grad
-            self.velocity[i] = self.beta2 * self.velocity[i] + (1 - self.beta2) * np.power(grad, 2)
-            m_h = self.momentum[i] / (1 - (self.beta1 ** self.t))
-            v_h = self.velocity[i] /  (1 - (self.beta2 ** self.t))
-            grads[i] = m_h / np.sqrt(v_h + eps)
-
-        grad_dW0, grad_db0, grad_dW1, grad_db1 = grads
-
-        # Update weights
-        self.W0 = self.W0 - self.lr * np.sum(grad_dW0, axis=0)
-        self.b0 = self.b0 - self.lr * np.sum(grad_db0, axis=0)
-        self.W1 = self.W1 - self.lr * np.sum(grad_dW1, axis=0)
-        self.b1 = self.b1 - self.lr * np.sum(grad_db1, axis=0)
-
-        return
 
     def backward(self, x, out):
         # ----------------------------------------
@@ -103,6 +80,6 @@ class Decoder(object):
         grads = [grad_dW0, grad_db0, grad_dW1, grad_db1]
 
         # Optimiser Step
-        self.optimise(grads)
+        self.optimiser.step(grads)
 
         return grad_dec
