@@ -7,8 +7,8 @@ except ImportError:
     import numpy as np
 
 
-def mnist_reader(data_path='./data/train-images-idx3-ubyte', 
-                label_path='./data/train-labels-idx1-ubyte'):
+def mnist_reader(data_path='../data/train-images-idx3-ubyte', 
+                label_path='../data/train-labels-idx1-ubyte'):
     """
     """
     def one_hot(label, output_dim):
@@ -77,9 +77,9 @@ def img_tile(imgs, path, epoch,
             tile_img[yoff:yoff+img_shape[0], xoff:xoff+img_shape[1], ...] = img 
 
     path_name = path + "/iteration_%03d"%(epoch)+".jpg"
-
+    tile_img = tile_img.squeeze()
     img = Image.fromarray(npy.uint8(tile_img * 255) , 'L')
     img.save(path_name)
-    
+
     return
 
